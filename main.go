@@ -133,9 +133,9 @@ func appMain(driver gxui.Driver) {
 		}
 		var items []*Viewer
 		adapter.SetData([]string{})
-		for _, tweet := range tweets {
-			tweet := tweet
-			driver.Events() <- func() {
+
+		makeStatus := func(tweet Tweet) func() {
+			return func() {
 				container := theme.CreateLinearLayout()
 
 				pict := theme.CreateImage()
@@ -157,6 +157,9 @@ func appMain(driver gxui.Driver) {
 				adapter.SetData(items)
 				adapter.SetItemSizeAsLargest(theme)
 			}
+		}
+		for _, tweet := range tweets {
+			driver.Events() <- makeStatus(tweet)
 		}
 	}
 
