@@ -261,21 +261,17 @@ func appMain(driver gxui.Driver) {
 	}
 	theme.SetDefaultFont(font)
 
-	window := theme.CreateWindow(500, 200, "gxuitter")
+	window := theme.CreateWindow(500, 500, "gxuitter")
 	window.SetPadding(math.Spacing{L: 10, T: 10, R: 10, B: 10})
 	window.OnClose(driver.Terminate)
 
-	layout := theme.CreateLinearLayout()
+	layout := theme.CreateSplitterLayout()
 	window.AddChild(layout)
 
 	list := theme.CreateList()
 	adapter := gxui.CreateDefaultAdapter()
 	list.SetAdapter(adapter)
 	layout.AddChild(list)
-
-	box := theme.CreateLinearLayout()
-	layout.SetVerticalAlignment(gxui.AlignBottom)
-	layout.AddChild(box)
 
 	row := theme.CreateLinearLayout()
 	row.SetOrientation(gxui.Horizontal)
@@ -285,7 +281,7 @@ func appMain(driver gxui.Driver) {
 	button.SetText("Update")
 	row.AddChild(button)
 	layout.AddChild(row)
-	//layout.SetChildWeight(row, 0.1) // 10% of the full height
+	layout.SetChildWeight(row, 0.1) // 10% of the full height
 
 	button.OnClick(func(ev gxui.MouseEvent) {
 		window.Close()
