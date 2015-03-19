@@ -180,6 +180,25 @@ func getTweets(token *oauth.Credentials, url_ string, opt option) ([]Tweet, erro
 	return tweets, nil
 }
 
+func postTweet(token *oauth.Credentials, url_ string, opt option) error {
+	param := make(url.Values)
+	for k, v := range opt {
+		param.Set(k, v)
+	}
+	oauthClient.SignParam(token, "POST", url_, param)
+	res, err := http.PostForm(url_, url.Values(param))
+	if err != nil {
+		log.Println("failed to post tweet:", err)
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Println("failed to get timeline:", err)
+		return err
+	}
+	return nil
+}
+
 type Viewer struct {
 	c gxui.Control
 }
@@ -283,48 +302,62 @@ func appMain(driver gxui.Driver) {
 	layout.AddChild(row)
 	layout.SetChildWeight(row, 0.1) // 10% of the full height
 
-	button.OnClick(func(ev gxui.MouseEvent) {
-		window.Close()
-	})
+	updateTimeline := func() {
+		driver.Events() <- func() {
+			adapter.SetData([]string{})
+			if false {
+				return
+			}
+			tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", nil)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			var items []*Viewer
+			adapter.SetData([]string{})
+			for _, tweet := range tweets {
+				func(tweet Tweet) {
+					driver.Events() <- func() {
+						container := theme.CreateLinearLayout()
 
-	driver.Events() <- func() {
-		adapter.SetData([]string{})
-		if false {
-			return
-		}
-		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var items []*Viewer
-		adapter.SetData([]string{})
-		for _, tweet := range tweets {
-			func(tweet Tweet) {
-				driver.Events() <- func() {
-					container := theme.CreateLinearLayout()
+						pict := theme.CreateImage()
+						texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
+						texture.SetFlipY(true)
+						pict.SetTexture(texture)
+						pict.SetExplicitSize(math.Size{32, 32})
+						container.AddChild(pict)
 
-					pict := theme.CreateImage()
-					texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
-					texture.SetFlipY(true)
-					pict.SetTexture(texture)
-					pict.SetExplicitSize(math.Size{32, 32})
-					container.AddChild(pict)
+						user := theme.CreateLabel()
+						user.SetText(tweet.User.ScreenName)
+						container.AddChild(user)
 
-					user := theme.CreateLabel()
-					user.SetText(tweet.User.ScreenName)
-					container.AddChild(user)
+						text := theme.CreateLabel()
+						text.SetText(tweet.Text)
+						container.AddChild(text)
 
-					text := theme.CreateLabel()
-					text.SetText(tweet.Text)
-					container.AddChild(text)
-
-					items = append(items, &Viewer{container})
-					adapter.SetData(items)
-					adapter.SetItemSizeAsLargest(theme)
-				}
-			}(tweet)
+						items = append(items, &Viewer{container})
+						adapter.SetData(items)
+						adapter.SetItemSizeAsLargest(theme)
+					}
+				}(tweet)
+			}
 		}
 	}
+
+	updateTimeline()
+
+	button.OnClick(func(ev gxui.MouseEvent) {
+		status := text.Text()
+		if status != "" {
+			err = postTweet(token, "https://api.twitter.com/1.1/statuses/update.json", option{"status": status, "in_reply_to_status_id": ""})
+			if err != nil {
+				log.Println(err)
+			} else {
+				text.SetText("")
+				updateTimeline()
+			}
+		}
+	})
 
 	gxui.EventLoop(driver)
 }
