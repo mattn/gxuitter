@@ -236,7 +236,7 @@ func appMain(driver gxui.Driver) {
 	file, config := getConfig()
 	cacheDir := filepath.Join(filepath.Dir(file), "cache")
 	if _, err := os.Stat(cacheDir); err != nil {
-		os.MkdirAll(cacheDir, 0600)
+		os.MkdirAll(cacheDir, 0700)
 	}
 
 	token, authorized, err := getAccessToken(config)
