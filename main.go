@@ -22,7 +22,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 )
 
 type Tweet struct {
@@ -145,8 +144,8 @@ func getConfig() (string, map[string]string) {
 
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		config["ClientToken"] = ""  // TODO
-		config["ClientSecret"] = "" // TODO
+		config["ClientToken"] = "KLxEvRpZAj1LWpnvbSAcjQj4P"
+		config["ClientSecret"] = "ZQyhEJy5tPnh2q3mZNyoRSFf53nfJ3dDmd81lR7rODdyZqFZxk"
 	} else {
 		err = json.Unmarshal(b, &config)
 		if err != nil {
@@ -192,7 +191,6 @@ func (v Viewer) View(t gxui.Theme) gxui.Control {
 func getImage(cacheDir, u string) image.Image {
 	x := fmt.Sprintf("%X", md5.Sum([]byte(u)))
 	cacheFile := filepath.Join(cacheDir, x)
-
 	black := MustAsset("data/black.png")
 
 	var img image.Image
@@ -237,7 +235,9 @@ func appMain(driver gxui.Driver) {
 
 	file, config := getConfig()
 	cacheDir := filepath.Join(filepath.Dir(file), "cache")
-	println(cacheDir)
+	if _, err := os.Stat(cacheDir); err != nil {
+		os.MkdirAll(cacheDir, 0600)
+	}
 
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
@@ -255,23 +255,22 @@ func appMain(driver gxui.Driver) {
 	}
 
 	theme := dark.CreateTheme(driver)
-	font, err := gl.CreateFont("Ricty-Regular", MustAsset(`data/Ricty-Regular.ttf`), theme.DefaultFont().Size())
+	font, err := gl.CreateFont("Ricty-Regular", MustAsset(`data/RictyDiminished-Regular.ttf`), theme.DefaultFont().Size())
 	if err != nil {
 		log.Fatal(err)
 	}
 	theme.SetDefaultFont(font)
 
 	window := theme.CreateWindow(500, 200, "gxuitter")
+	window.OnClose(driver.Terminate)
+
 	layout := theme.CreateLinearLayout()
 	window.AddChild(layout)
 
-	scrolllayout := theme.CreateScrollLayout()
-	scrolllayout.SetScrollAxis(false, true)
 	list := theme.CreateList()
 	adapter := gxui.CreateDefaultAdapter()
 	list.SetAdapter(adapter)
-	scrolllayout.SetChild(list)
-	layout.AddChild(scrolllayout)
+	layout.AddChild(list)
 
 	box := theme.CreateLinearLayout()
 	layout.SetVerticalAlignment(gxui.AlignBottom)
@@ -284,13 +283,11 @@ func appMain(driver gxui.Driver) {
 	button.SetText("Update")
 	box.AddChild(button)
 
-	window.OnClose(driver.Terminate)
-
 	button.OnClick(func(ev gxui.MouseEvent) {
 		window.Close()
 	})
 
-	go func() {
+	driver.Events() <- func() {
 		adapter.SetData([]string{})
 		if false {
 			return
@@ -299,45 +296,39 @@ func appMain(driver gxui.Driver) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		var wg sync.WaitGroup
-		var mutex sync.Mutex
 		var items []*Viewer
 		adapter.SetData([]string{})
 		for _, tweet := range tweets {
-			wg.Add(1)
-			go func(tweet Tweet) {
-				defer wg.Done()
+			func(tweet Tweet) {
+				driver.Events() <- func() {
+					container := theme.CreateLinearLayout()
 
-				container := theme.CreateLinearLayout()
+					pict := theme.CreateImage()
+					texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
+					texture.SetFlipY(true)
+					pict.SetTexture(texture)
+					pict.SetExplicitSize(math.Size{32, 32})
+					container.AddChild(pict)
 
-				pict := theme.CreateImage()
-				texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
-				texture.SetFlipY(true)
-				pict.SetTexture(texture)
-				pict.SetExplicitSize(math.Size{32, 32})
-				container.AddChild(pict)
+					user := theme.CreateLabel()
+					user.SetText(tweet.User.ScreenName)
+					container.AddChild(user)
 
-				user := theme.CreateLabel()
-				user.SetText(tweet.User.ScreenName)
-				container.AddChild(user)
+					text := theme.CreateLabel()
+					text.SetText(tweet.Text)
+					container.AddChild(text)
 
-				text := theme.CreateLabel()
-				text.SetText(tweet.Text)
-				container.AddChild(text)
-
-				mutex.Lock()
-				items = append(items, &Viewer{container})
-				adapter.SetData(items)
-				adapter.SetItemSizeAsLargest(theme)
-				mutex.Unlock()
+					items = append(items, &Viewer{container})
+					adapter.SetData(items)
+					adapter.SetItemSizeAsLargest(theme)
+				}
 			}(tweet)
 		}
-		wg.Wait()
-	}()
+	}
 
 	gxui.EventLoop(driver)
 }
 
 func main() {
-	gl.StartDriver("", appMain)
+	gl.StartDriver("./data", appMain)
 }
