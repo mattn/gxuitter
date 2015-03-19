@@ -18,6 +18,11 @@ import (
 	"path/filepath"
 )
 
+const (
+	POST_TWEET_ENDPOINT    = "https://api.twitter.com/1.1/statuses/update.json"
+	HOME_TIMELINE_ENDPOINT = "https://api.twitter.com/1.1/statuses/home_timeline.json"
+)
+
 type Viewer struct {
 	c gxui.Control
 }
@@ -126,7 +131,7 @@ func appMain(driver gxui.Driver) {
 		if false {
 			return
 		}
-		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", nil)
+		tweets, err := getTweets(token, HOME_TIMELINE_ENDPOINT, nil)
 		if err != nil {
 			log.Println(err)
 			return
@@ -165,7 +170,7 @@ func appMain(driver gxui.Driver) {
 	button.OnClick(func(ev gxui.MouseEvent) {
 		status := text.Text()
 		if status != "" {
-			err = postTweet(token, "https://api.twitter.com/1.1/statuses/update.json", option{"status": status, "in_reply_to_status_id": ""})
+			err = postTweet(token, POST_TWEET_ENDPOINT, option{"status": status, "in_reply_to_status_id": ""})
 			if err != nil {
 				log.Println(err)
 			} else {
