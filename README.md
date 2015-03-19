@@ -12,6 +12,11 @@ twitter client using [GXUI](https://github.com/google/gxui)
 $ make
 ```
 
+## TODO
+
+* Doesn't work with gif image
+* Input Method doesn't work for GXUI
+
 ## License
 
 MIT
