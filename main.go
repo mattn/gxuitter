@@ -2,15 +2,18 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"github.com/daviddengcn/go-colortext"
 	"github.com/garyburd/go-oauth/oauth"
 	"github.com/google/gxui"
 	"github.com/google/gxui/drivers/gl"
-	//"github.com/google/gxui/math"
+	"github.com/google/gxui/math"
 	"github.com/google/gxui/themes/dark"
-	//"image"
+	"image"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -21,15 +24,6 @@ import (
 	"runtime"
 	"sync"
 )
-
-type Driver struct {
-	gxui.Driver
-}
-
-func (d Driver) CreateFont(name string, size int) gxui.Font {
-	log.Println(name + " なんてロードしねぇよ(ﾊﾞｰｶﾊﾞｰｶ")
-	return gl.CreateFont("Ricty-Regular", MustAsset(`data/Ricty-Regular.ttf`), size)
-}
 
 type Tweet struct {
 	Text       string `json:"text"`
@@ -195,17 +189,56 @@ func (v Viewer) View(t gxui.Theme) gxui.Control {
 	return v.c
 }
 
-func appMain(driver gxui.Driver) {
-	defer func() {
-		err := recover()
+func getImage(cacheDir, u string) image.Image {
+	x := fmt.Sprintf("%X", md5.Sum([]byte(u)))
+	cacheFile := filepath.Join(cacheDir, x)
+
+	black := MustAsset("data/black.png")
+
+	var img image.Image
+	if _, err := os.Stat(cacheFile); err != nil {
+		res, err := http.Get(u)
 		if err != nil {
 			log.Println(err)
-			os.Exit(1)
-			return
+			ioutil.WriteFile(cacheFile, black, 0644)
+		} else {
+			defer res.Body.Close()
+			f, err := os.Create(cacheFile)
+			if err != nil {
+				log.Println(err)
+				return nil
+			}
+			io.Copy(f, res.Body)
+			f.Close()
 		}
-	}()
+	}
+	f, err := os.Open(cacheFile)
+	if err == nil {
+		defer f.Close()
+		img, _, err = image.Decode(f)
+	}
+	if img == nil {
+		img, _, _ = image.Decode(bytes.NewReader(MustAsset("data/black.png")))
+	}
+	return img
+}
+
+func appMain(driver gxui.Driver) {
+	/*
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Println(err)
+				os.Exit(1)
+				return
+			}
+		}()
+	*/
 
 	file, config := getConfig()
+	cacheDir := filepath.Join(filepath.Dir(file), "cache")
+	println(cacheDir)
+
 	token, authorized, err := getAccessToken(config)
 	if err != nil {
 		log.Fatal("faild to get access token:", err)
@@ -221,88 +254,86 @@ func appMain(driver gxui.Driver) {
 		}
 	}
 
-	theme := dark.CreateTheme(Driver{driver})
-	layout := theme.CreateLinearLayout()
-	layout.SetHorizontalAlignment(gxui.AlignCenter)
+	theme := dark.CreateTheme(driver)
+	font, err := gl.CreateFont("Ricty-Regular", MustAsset(`data/Ricty-Regular.ttf`), theme.DefaultFont().Size())
+	if err != nil {
+		log.Fatal(err)
+	}
+	theme.SetDefaultFont(font)
 
+	window := theme.CreateWindow(500, 200, "gxuitter")
+	layout := theme.CreateLinearLayout()
+	window.AddChild(layout)
+
+	scrolllayout := theme.CreateScrollLayout()
+	scrolllayout.SetScrollAxis(false, true)
 	list := theme.CreateList()
 	adapter := gxui.CreateDefaultAdapter()
-	adapter.SetData([]string{"foo", "bar"})
 	list.SetAdapter(adapter)
-	layout.AddChild(list)
+	scrolllayout.SetChild(list)
+	layout.AddChild(scrolllayout)
+
+	box := theme.CreateLinearLayout()
+	layout.SetVerticalAlignment(gxui.AlignBottom)
+	layout.AddChild(box)
+
+	text := theme.CreateTextBox()
+	box.AddChild(text)
+
+	button := theme.CreateButton()
+	button.SetText("Update")
+	box.AddChild(button)
+
+	window.OnClose(driver.Terminate)
+
+	button.OnClick(func(ev gxui.MouseEvent) {
+		window.Close()
+	})
 
 	go func() {
 		adapter.SetData([]string{})
+		if false {
+			return
+		}
 		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", nil)
 		if err != nil {
 			log.Fatal(err)
 		}
 		var wg sync.WaitGroup
 		var mutex sync.Mutex
-		var items []Viewer
+		var items []*Viewer
+		adapter.SetData([]string{})
 		for _, tweet := range tweets {
 			wg.Add(1)
-			go func() {
+			go func(tweet Tweet) {
 				defer wg.Done()
-				println(tweet.User.ProfileImageURL)
-				res, err := http.Get(tweet.User.ProfileImageURL)
-				if err != nil {
-					log.Println(err)
-					return
-				}
-				defer res.Body.Close()
-				container := theme.CreateLinearLayout()
-				container.SetVerticalAlignment(gxui.AlignMiddle)
-				/*
-					img, _, err := image.Decode(res.Body)
-					if err != nil {
-						log.Println(err)
-						return
-					}
-					TODO: Doesn't work correctly
-					pict := theme.CreateImage()
-					pict.SetTexture(driver.CreateTexture(img, 96))
-					pict.SetExplicitSize(math.Size{32, 32})
-					container.AddChild(pict)
-				*/
-				/*
-					TODO: Doesn't work correctly
-					user := theme.CreateLabel()
-					user.SetText(tweet.User.ScreenName)
-					container.AddChild(user)
 
-					println(tweet.Text)
-					text := theme.CreateLabel()
-					text.SetText(tweet.Text)
-					container.AddChild(text)
-				*/
-				label := theme.CreateLabel()
-				label.SetText(fmt.Sprintf("%s: %s", tweet.User.ScreenName, tweet.Text))
-				container.AddChild(label)
+				container := theme.CreateLinearLayout()
+
+				pict := theme.CreateImage()
+				texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
+				texture.SetFlipY(true)
+				pict.SetTexture(texture)
+				pict.SetExplicitSize(math.Size{32, 32})
+				container.AddChild(pict)
+
+				user := theme.CreateLabel()
+				user.SetText(tweet.User.ScreenName)
+				container.AddChild(user)
+
+				text := theme.CreateLabel()
+				text.SetText(tweet.Text)
+				container.AddChild(text)
 
 				mutex.Lock()
-				defer mutex.Unlock()
-				items = append(items, Viewer{container})
-			}()
-			wg.Wait()
+				items = append(items, &Viewer{container})
+				adapter.SetData(items)
+				adapter.SetItemSizeAsLargest(theme)
+				mutex.Unlock()
+			}(tweet)
 		}
-		adapter.SetData(items)
+		wg.Wait()
 	}()
-
-	text := theme.CreateTextBox()
-	layout.AddChild(text)
-
-	button := theme.CreateButton()
-	button.SetText("Update")
-	layout.AddChild(button)
-
-	window := theme.CreateWindow(500, 200, "gxuitter")
-	window.AddChild(layout)
-	window.OnClose(driver.Terminate)
-
-	button.OnClick(func(ev gxui.MouseEvent) {
-		window.Close()
-	})
 
 	gxui.EventLoop(driver)
 }
