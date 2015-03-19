@@ -93,7 +93,7 @@ func appMain(driver gxui.Driver) {
 	}
 
 	theme := dark.CreateTheme(driver)
-	font, err := gl.CreateFont("Ricty-Regular", MustAsset(`data/RictyDiminished-Regular.ttf`), 20)
+	font, err := gl.CreateFont("Ricty-Regular", MustAsset(`data/RictyDiminished-Regular.ttf`), 12)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -122,48 +122,45 @@ func appMain(driver gxui.Driver) {
 	layout.SetChildWeight(row, 0.1) // 10% of the full height
 
 	updateTimeline := func() {
-		driver.Events() <- func() {
-			adapter.SetData([]string{})
-			if false {
-				return
-			}
-			tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", nil)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			var items []*Viewer
-			adapter.SetData([]string{})
-			for _, tweet := range tweets {
-				func(tweet Tweet) {
-					driver.Events() <- func() {
-						container := theme.CreateLinearLayout()
+		adapter.SetData([]string{})
+		if false {
+			return
+		}
+		tweets, err := getTweets(token, "https://api.twitter.com/1.1/statuses/home_timeline.json", nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		var items []*Viewer
+		adapter.SetData([]string{})
+		for _, tweet := range tweets {
+			tweet := tweet
+			driver.Events() <- func() {
+				container := theme.CreateLinearLayout()
 
-						pict := theme.CreateImage()
-						texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
-						texture.SetFlipY(true)
-						pict.SetTexture(texture)
-						pict.SetExplicitSize(math.Size{32, 32})
-						container.AddChild(pict)
+				pict := theme.CreateImage()
+				texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
+				texture.SetFlipY(true)
+				pict.SetTexture(texture)
+				pict.SetExplicitSize(math.Size{32, 32})
+				container.AddChild(pict)
 
-						user := theme.CreateLabel()
-						user.SetText(tweet.User.ScreenName)
-						container.AddChild(user)
+				user := theme.CreateLabel()
+				user.SetText(tweet.User.ScreenName)
+				container.AddChild(user)
 
-						text := theme.CreateLabel()
-						text.SetText(tweet.Text)
-						container.AddChild(text)
+				text := theme.CreateLabel()
+				text.SetText(tweet.Text)
+				container.AddChild(text)
 
-						items = append(items, &Viewer{container})
-						adapter.SetData(items)
-						adapter.SetItemSizeAsLargest(theme)
-					}
-				}(tweet)
+				items = append(items, &Viewer{container})
+				adapter.SetData(items)
+				adapter.SetItemSizeAsLargest(theme)
 			}
 		}
 	}
 
-	updateTimeline()
+	driver.Events() <- updateTimeline
 
 	button.OnClick(func(ev gxui.MouseEvent) {
 		status := text.Text()
@@ -173,7 +170,8 @@ func appMain(driver gxui.Driver) {
 				log.Println(err)
 			} else {
 				text.SetText("")
-				updateTimeline()
+
+				driver.Events() <- updateTimeline
 			}
 		}
 	})
