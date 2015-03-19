@@ -164,15 +164,17 @@ func appMain(driver gxui.Driver) {
 
 	button.OnClick(func(ev gxui.MouseEvent) {
 		status := text.Text()
-		if status != "" {
-			err = postTweet(token, POST_TWEET_ENDPOINT, option{"status": status, "in_reply_to_status_id": ""})
-			if err != nil {
-				log.Println(err)
-			} else {
-				text.SetText("")
-
-				driver.Events() <- updateTimeline
-			}
+		if status == "" {
+			return
+		}
+		err = postTweet(token, POST_TWEET_ENDPOINT, option{
+			"status":                status,
+			"in_reply_to_status_id": ""})
+		if err != nil {
+			log.Println(err)
+		} else {
+			text.SetText("")
+			driver.Events() <- updateTimeline
 		}
 	})
 
