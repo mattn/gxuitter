@@ -16,6 +16,10 @@ $ make
 
 * Doesn't work with gif image
 * Input Method doesn't work for GXUI
+* Interval timer for updating statuses
+* Retweeeeeeeeeeeet
+* Favorite
+* Inline image in the tweet
 
 ## License
 
