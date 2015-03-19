@@ -4,15 +4,12 @@ twitter client using [GXUI](https://github.com/google/gxui)
 
 ## Requirements
 
-* go-bindata
+* [go-bindata](https://github.com/jteeuwen/go-bindata)
 
 ## Build
 
 ```
-$ mkdir data
-$ cp /path/to/RictyDiminished-Regular.ttf data/.
-$ go-bindata data
-$ go build
+$ make
 ```
 
 ## License
