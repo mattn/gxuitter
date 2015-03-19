@@ -10,7 +10,7 @@ twitter client using [GXUI](https://github.com/google/gxui)
 
 ```
 $ mkdir data
-$ cp /path/to/Ricty-Regular.ttf data/.
+$ cp /path/to/RictyDiminished-Regular.ttf data/.
 $ go-bindata data
 $ go build
 ```
