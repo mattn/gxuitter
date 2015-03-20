@@ -10,7 +10,9 @@ import (
 	"github.com/google/gxui/math"
 	"github.com/google/gxui/themes/dark"
 	"image"
-	"io"
+	"image/draw"
+	"image/jpeg"
+	"image/png"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -29,29 +31,41 @@ func (v Viewer) View(t gxui.Theme) gxui.Control {
 func getImage(cacheDir, u string) image.Image {
 	x := fmt.Sprintf("%X", md5.Sum([]byte(u)))
 	cacheFile := filepath.Join(cacheDir, x)
-	black := MustAsset("data/black.png")
 
 	var img image.Image
 	if _, err := os.Stat(cacheFile); err != nil {
 		res, err := http.Get(u)
 		if err != nil {
-			log.Println(err)
-			ioutil.WriteFile(cacheFile, black, 0644)
+			log.Println(u, err)
 		} else {
 			defer res.Body.Close()
-			f, err := os.Create(cacheFile)
-			if err != nil {
-				log.Println(err)
-				return nil
+			if res.Header.Get("Content-Type") == "image/jpeg" {
+				img, err = jpeg.Decode(res.Body)
+			} else {
+				img, _, err = image.Decode(res.Body)
 			}
-			io.Copy(f, res.Body)
-			f.Close()
+			if err == nil {
+				rect := image.Rect(0, 0, 32, 32)
+				tmp := image.NewRGBA(rect)
+				draw.Draw(tmp, rect, img, image.Point{0, 0}, draw.Src)
+				img = tmp
+				f, err := os.Create(cacheFile)
+				if err == nil {
+					defer f.Close()
+					png.Encode(f, img)
+				}
+			} else {
+				log.Println(u, err)
+			}
 		}
-	}
-	f, err := os.Open(cacheFile)
-	if err == nil {
-		defer f.Close()
-		img, _, err = image.Decode(f)
+	} else {
+		f, err := os.Open(cacheFile)
+		if err == nil {
+			defer f.Close()
+			img, _, _ = image.Decode(f)
+		} else {
+			log.Println(u, err)
+		}
 	}
 	if img == nil {
 		img, _, _ = image.Decode(bytes.NewReader(MustAsset("data/black.png")))
