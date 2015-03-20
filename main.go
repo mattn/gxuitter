@@ -93,7 +93,7 @@ func appMain(driver gxui.Driver) {
 	}
 
 	theme := dark.CreateTheme(driver)
-	font, err := gl.CreateFont("Ricty-Regular", MustAsset(`data/RictyDiminished-Regular.ttf`), 12)
+	font, err := driver.CreateFont(MustAsset(`data/RictyDiminished-Regular.ttf`), 12)
 	if err != nil {
 		log.Fatal(err)
 	}
