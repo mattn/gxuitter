@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"github.com/garyburd/go-oauth/oauth"
 	"github.com/google/gxui"
 	"github.com/google/gxui/drivers/gl"
 	"github.com/google/gxui/math"
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 type Viewer struct {
@@ -73,6 +75,48 @@ func getImage(cacheDir, u string) image.Image {
 	return img
 }
 
+type gxuitter struct {
+	file     string
+	config   map[string]string
+	cacheDir string
+	token    *oauth.Credentials
+}
+
+func (g *gxuitter) ConfigString(k string) string {
+	return g.config[k]
+}
+
+func (g *gxuitter) ConfigInt(k string) int {
+	i, _ := strconv.Atoi(g.config[k])
+	return i
+}
+
+func (g *gxuitter) LoadConfig() {
+	g.file, g.config = getConfig()
+	g.cacheDir = filepath.Join(filepath.Dir(g.file), "cache")
+	if _, err := os.Stat(g.cacheDir); err != nil {
+		os.MkdirAll(g.cacheDir, 0700)
+	}
+
+	var err error
+	var authorlized bool
+	g.token, authorlized, err = getAccessToken(g.config)
+	if err != nil {
+		log.Fatal("faild to get access token:", err)
+	}
+	if authorlized {
+		b, err := json.MarshalIndent(g.config, "", "  ")
+		if err != nil {
+			log.Fatal("failed to store file:", err)
+		}
+		err = ioutil.WriteFile(g.file, b, 0700)
+		if err != nil {
+			log.Fatal("failed to store file:", err)
+		}
+		log.Println(`if you don't see the tweets in broken fonts, set "FontFile" to the path of truetype font file in`, g.file)
+	}
+}
+
 func appMain(driver gxui.Driver) {
 	/*
 		defer func() {
@@ -84,34 +128,23 @@ func appMain(driver gxui.Driver) {
 			}
 		}()
 	*/
-
-	file, config := getConfig()
-	cacheDir := filepath.Join(filepath.Dir(file), "cache")
-	if _, err := os.Stat(cacheDir); err != nil {
-		os.MkdirAll(cacheDir, 0700)
-	}
-
-	token, authorized, err := getAccessToken(config)
-	if err != nil {
-		log.Fatal("faild to get access token:", err)
-	}
-	if authorized {
-		b, err := json.MarshalIndent(config, "", "  ")
-		if err != nil {
-			log.Fatal("failed to store file:", err)
-		}
-		err = ioutil.WriteFile(file, b, 0700)
-		if err != nil {
-			log.Fatal("failed to store file:", err)
-		}
-	}
+	g := new(gxuitter)
+	g.LoadConfig()
 
 	theme := dark.CreateTheme(driver)
-	font, err := driver.CreateFont(MustAsset(`data/RictyDiminished-Regular.ttf`), 12)
-	if err != nil {
-		log.Fatal(err)
+
+	fontFile := g.ConfigString("FontFile")
+	fontSize := g.ConfigInt("FontSize")
+	if fontSize <= 0 {
+		fontSize = 12
 	}
-	theme.SetDefaultFont(font)
+	if fontFile != "" {
+		b, err := ioutil.ReadFile(fontFile)
+		font, err := driver.CreateFont(b, fontSize)
+		if err == nil {
+			theme.SetDefaultFont(font)
+		}
+	}
 
 	window := theme.CreateWindow(500, 500, "gxuitter")
 	window.SetPadding(math.Spacing{L: 10, T: 10, R: 10, B: 10})
@@ -138,10 +171,7 @@ func appMain(driver gxui.Driver) {
 	layout.SetChildWeight(row, 0.1) // 10% of the full height
 
 	updateTimeline := func() {
-		if false {
-			return
-		}
-		tweets, err := getTweets(token, HOME_TIMELINE_ENDPOINT, nil)
+		tweets, err := getTweets(g.token, HOME_TIMELINE_ENDPOINT, nil)
 		if err != nil {
 			log.Println(err)
 			return
@@ -154,7 +184,7 @@ func appMain(driver gxui.Driver) {
 				container := theme.CreateLinearLayout()
 
 				pict := theme.CreateImage()
-				texture := driver.CreateTexture(getImage(cacheDir, tweet.User.ProfileImageURL), 96)
+				texture := driver.CreateTexture(getImage(g.cacheDir, tweet.User.ProfileImageURL), 96)
 				texture.SetFlipY(true)
 				pict.SetTexture(texture)
 				pict.SetExplicitSize(math.Size{32, 32})
@@ -185,7 +215,7 @@ func appMain(driver gxui.Driver) {
 		if status == "" {
 			return
 		}
-		err = postTweet(token, POST_TWEET_ENDPOINT, option{
+		err := postTweet(g.token, POST_TWEET_ENDPOINT, option{
 			"status":                status,
 			"in_reply_to_status_id": ""})
 		if err != nil {
