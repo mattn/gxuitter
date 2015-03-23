@@ -19,6 +19,7 @@ import (
 const (
 	POST_TWEET_ENDPOINT    = "https://api.twitter.com/1.1/statuses/update.json"
 	HOME_TIMELINE_ENDPOINT = "https://api.twitter.com/1.1/statuses/home_timeline.json"
+	USER_TIMELINE_ENDPOINT = "https://api.twitter.com/1.1/statuses/user_timeline.json"
 )
 
 type Tweet struct {
