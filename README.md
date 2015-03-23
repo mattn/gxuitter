@@ -2,10 +2,10 @@
 
 twitter client using [GXUI](https://github.com/google/gxui)
 
-## Build
+## Installation
 
 ```
-$ make
+$ go get github.com/mattn/gxuitter
 ```
 
 ## Configurations
