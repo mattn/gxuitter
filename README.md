@@ -1,5 +1,7 @@
 # gxuitter
 
+![](http://go-gyazo.appspot.com/7b81fc2dd93310cf.png)
+
 twitter client using [GXUI](https://github.com/google/gxui)
 
 ## Installation
