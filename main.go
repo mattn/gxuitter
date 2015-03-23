@@ -125,18 +125,19 @@ func appMain(driver gxui.Driver) {
 	list.SetAdapter(adapter)
 	layout.AddChild(list)
 
-	row := theme.CreateLinearLayout()
+	row := theme.CreateSplitterLayout()
 	row.SetOrientation(gxui.Horizontal)
 	text := theme.CreateTextBox()
 	row.AddChild(text)
 	button := theme.CreateButton()
 	button.SetText("Update")
+	button.SetPadding(math.Spacing{L: 10, T: 10, R: 10, B: 10})
 	row.AddChild(button)
+	row.SetChildWeight(button, 0.2) // 20% of the full width
 	layout.AddChild(row)
 	layout.SetChildWeight(row, 0.1) // 10% of the full height
 
 	updateTimeline := func() {
-		adapter.SetData([]string{})
 		if false {
 			return
 		}
@@ -146,7 +147,7 @@ func appMain(driver gxui.Driver) {
 			return
 		}
 		var items []*Viewer
-		adapter.SetData([]string{})
+		adapter.SetItems([]string{})
 
 		makeStatus := func(tweet Tweet) func() {
 			return func() {
@@ -168,8 +169,8 @@ func appMain(driver gxui.Driver) {
 				container.AddChild(text)
 
 				items = append(items, &Viewer{container})
-				adapter.SetData(items)
-				adapter.SetItemSizeAsLargest(theme)
+				adapter.SetItems(items)
+				adapter.SetSizeAsLargest(theme)
 			}
 		}
 		for _, tweet := range tweets {
@@ -199,5 +200,5 @@ func appMain(driver gxui.Driver) {
 }
 
 func main() {
-	gl.StartDriver("", appMain)
+	gl.StartDriver(appMain)
 }
