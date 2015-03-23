@@ -42,7 +42,6 @@ If you want to change font,
 * Input Method doesn't work for GXUI ()
       Issue [#60](https://github.com/google/gxui/issues/60) on GXUI
       Issue [#473](https://github.com/glfw/glfw/pull/473) on glfw
-
 * Interval timer for updating statuses
 * Retweeeeeeeeeeeet
 * Favorite
