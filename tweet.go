@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/daviddengcn/go-colortext"
 	"github.com/garyburd/go-oauth/oauth"
@@ -168,7 +169,7 @@ func getTweets(token *oauth.Credentials, url_ string, opt option) ([]Tweet, erro
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, err
+		return nil, errors.New(res.Status)
 	}
 	var tweets []Tweet
 	err = json.NewDecoder(res.Body).Decode(&tweets)
