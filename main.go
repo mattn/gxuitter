@@ -12,6 +12,7 @@ import (
 	"github.com/google/gxui/themes/dark"
 	"image"
 	"image/draw"
+	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"io/ioutil"
@@ -41,8 +42,11 @@ func getImage(cacheDir, u string) image.Image {
 			log.Println(u, err)
 		} else {
 			defer res.Body.Close()
-			if res.Header.Get("Content-Type") == "image/jpeg" {
+			ct := res.Header.Get("Content-Type")
+			if ct == "image/jpeg" {
 				img, err = jpeg.Decode(res.Body)
+			} else if ct == "image/gif" {
+				img, err = gif.Decode(res.Body)
 			} else {
 				img, _, err = image.Decode(res.Body)
 			}
@@ -158,17 +162,18 @@ func appMain(driver gxui.Driver) {
 	list.SetAdapter(adapter)
 	layout.AddChild(list)
 
-	row := theme.CreateSplitterLayout()
-	row.SetOrientation(gxui.Horizontal)
-	text := theme.CreateTextBox()
-	row.AddChild(text)
+	row := theme.CreateLinearLayout()
+	row.SetDirection(gxui.RightToLeft)
 	button := theme.CreateButton()
 	button.SetText("Update")
-	button.SetPadding(math.Spacing{L: 10, T: 10, R: 10, B: 10})
+	button.SetSizeMode(gxui.ExpandToContent)
 	row.AddChild(button)
-	row.SetChildWeight(button, 0.2) // 20% of the full width
+	text := theme.CreateTextBox()
+	text.SetDesiredWidth(800)
+	row.AddChild(text)
+	row.SetSizeMode(gxui.Fill)
 	layout.AddChild(row)
-	layout.SetChildWeight(row, 0.1) // 10% of the full height
+	layout.SetChildWeight(row, 0.1)
 
 	updateTimeline := func() {
 		tweets, err := getTweets(g.token, HOME_TIMELINE_ENDPOINT, nil)
@@ -185,18 +190,24 @@ func appMain(driver gxui.Driver) {
 
 				pict := theme.CreateImage()
 				texture := driver.CreateTexture(getImage(g.cacheDir, tweet.User.ProfileImageURL), 96)
-				texture.SetFlipY(true)
 				pict.SetTexture(texture)
 				pict.SetExplicitSize(math.Size{32, 32})
 				container.AddChild(pict)
 
 				user := theme.CreateLabel()
 				user.SetText(tweet.User.ScreenName)
+				user.OnMouseEnter(func(ev gxui.MouseEvent) {
+					user.SetColor(gxui.Red)
+				})
+				user.OnMouseExit(func(ev gxui.MouseEvent) {
+					user.SetColor(gxui.White)
+				})
 				container.AddChild(user)
 
 				text := theme.CreateLabel()
 				text.SetText(tweet.Text)
 				container.AddChild(text)
+				container.SetSizeMode(gxui.ExpandToContent)
 
 				items = append(items, &Viewer{container})
 				adapter.SetItems(items)
