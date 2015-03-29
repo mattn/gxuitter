@@ -51,9 +51,8 @@ func getImage(cacheDir, u string) image.Image {
 				img, _, err = image.Decode(res.Body)
 			}
 			if err == nil {
-				rect := image.Rect(0, 0, 32, 32)
-				tmp := image.NewRGBA(rect)
-				draw.Draw(tmp, rect, img, image.Point{0, 0}, draw.Src)
+				tmp := image.NewRGBA(img.Bounds())
+				draw.Draw(tmp, img.Bounds(), img, image.Point{0, 0}, draw.Src)
 				img = tmp
 				f, err := os.Create(cacheFile)
 				if err == nil {
@@ -181,6 +180,16 @@ func appMain(driver gxui.Driver) {
 			log.Println(err)
 			return
 		}
+		/*
+			var tweets []Tweet
+			for i := 0; i < 20; i++ {
+				var tweet Tweet
+				tweet.Text = "てすと"
+				tweet.User.ScreenName = "mattn"
+				tweet.User.ProfileImageURL = "http://mattn.kaoriya.net/images/logo.png"
+				tweets = append(tweets, tweet)
+			}
+		*/
 		var items []*Viewer
 		adapter.SetItems([]string{})
 
@@ -190,8 +199,8 @@ func appMain(driver gxui.Driver) {
 
 				pict := theme.CreateImage()
 				texture := driver.CreateTexture(getImage(g.cacheDir, tweet.User.ProfileImageURL), 96)
-				pict.SetTexture(texture)
 				pict.SetExplicitSize(math.Size{32, 32})
+				pict.SetTexture(texture)
 				container.AddChild(pict)
 
 				user := theme.CreateLabel()
@@ -215,11 +224,11 @@ func appMain(driver gxui.Driver) {
 			}
 		}
 		for _, tweet := range tweets {
-			driver.Events() <- makeStatus(tweet)
+			driver.Call(makeStatus(tweet))
 		}
 	}
 
-	driver.Events() <- updateTimeline
+	driver.Call(updateTimeline)
 
 	button.OnClick(func(ev gxui.MouseEvent) {
 		status := text.Text()
@@ -233,11 +242,9 @@ func appMain(driver gxui.Driver) {
 			log.Println(err)
 		} else {
 			text.SetText("")
-			driver.Events() <- updateTimeline
+			driver.Call(updateTimeline)
 		}
 	})
-
-	gxui.EventLoop(driver)
 }
 
 func main() {
